@@ -1,11 +1,10 @@
-import matplotlib.pyplot as plt
 import numpy as np
 
 import constants as c
 import dae
 
 
-class ECAR:
+class ACAIE:
     def __init__(self, dose_time, mix_time, dose_rate, dose_load,
                  initial_conc):
         self.dose_time, self.mix_time, self.dose_rate, self.dose_load, self.initial_conc = dose_time, mix_time, dose_rate, dose_load, initial_conc

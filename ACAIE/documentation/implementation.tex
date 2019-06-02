@@ -1,0 +1,215 @@
+\documentclass[11pt]{scrartcl} % scrartcl for smaller documents, scrreprt for longer papers
+\usepackage[chem]{druv}
+
+\begin{document}
+
+\title{ACAIE Implementation Details}
+
+\maketitle
+
+\tableofcontents
+
+\section{Quick Start}
+
+\subsection{Installation Guide}
+
+The following steps provide a method for quickly and properly installing the simulation program as well as its dependencies. This method should hopefully be platform-agnostic.
+
+\begin{enumerate}
+    \ii Open and unzip the software into a folder of your choice.
+
+    \ii Download and install, through a package manager or otherwise, the \href{https://www.anaconda.com/}{Anaconda} distribution for \href{https://www.python.org/downloads/}{Python 3.6} or later. The software should install the requisite version of Python if it's not already on the system, but if it doesn't for some reason, download and install it as well.
+
+    \ii Ensure that Anaconda is in your \verb|PATH| environment variable. Write and run the following command in a terminal, such as the Unix terminal on Mac or Linux systems or \href{https://gitforwindows.org/}{Git Bash} for Windows systems:
+    \[\verb|conda|\]
+    If your terminal doesn't fail to recognize the \verb|conda| executable, move on. If it does fail to recognize the program, retry the installation, or otherwise safely add the \verb|conda| executable to the \verb|PATH| environment variable.
+
+    \ii Navigate, in the terminal, to the folder containing the software and ensure that it contains a file named \verb|environment.yml|. Write and run the following command in terminal:
+    \[\verb|conda env create -f environment.yml|\]
+
+    \ii Ensure that the environment has been created successfully. Write and run the following command in terminal:
+    \[\verb|conda-env list|\]
+    If an environment named \verb|ACAIE| is displayed, then the procedure has succeeded. Else, try again from the beginning or wherever the procedure may have failed.
+            \end{enumerate}
+
+            If all this has been done, the program is effectively installed.
+
+            \subsection{Usage Guide}
+
+            The following steps are to be done whenever running the simulation program. It will ensure that the program has all its dependencies, by loading into the Anaconda environment packaged with the software.
+
+            \begin{enumerate}
+                \ii Navigate, in the terminal, to the folder containing the software. In the terminal, write and run the following command:
+                \[\verb|activate ACAIE| \text{ (on Windows)} \qc \verb|source activate ACAIE| \text{ (on MacOS or Linux)}\]
+                If this is succesful, the text \verb|(ACAIE)| will appear on the next lines of text in the terminal before the typable-in field. This will appear until the command
+                \[\verb|deactivate| \text{ (on Windows)} \qc \verb|source deactivate| \text{ (on MacOS or Linux)}\]
+                is written and run.
+                \ii Execute the program. Write and run the command
+                \[\verb|jupyter notebook|\]
+                in terminal. Select \verb|simulation.ipynb|. Follow the instructions on the Jupyter Notebook.
+        \end{enumerate}
+
+
+        \section{Program Components}
+
+        Here we discuss a high level organization of the system. This is here for the purpose of program organization and to allow easy extensions to the program.
+
+        \begin{enumerate}
+            \ii \verb|simulation.ipynb|: the driver notebook that allows for human interaction with the program, as well as provides an interface for plotting.
+            \ii \verb|system.py|: the file which holds the \verb|ACAIE| class and simulation and plot functions.
+            \ii \verb|dae.py|: the file which holds the methods used to integrate the differential algebraic equation (DAE) modeling the chemical system. The integration scheme utilizes the \href{https://jmodelica.org/assimulo/}{Assimulo} package.
+            \ii \verb|constants.py|: the file that holds all the constants and some auxiliary functions, namely to determine some ``constants'' which actually vary with pH, as well as compute an adsorbed concentration vector.
+    \end{enumerate}
+
+    \section{Equations and Constants}
+
+    \subsection{Equations}
+
+    The main system simulated is given by the following equations, which are obtained from the article \textit{Modeling} $\ch{As (III)}$ \textit{Oxidation and Removal with Iron Electrocoagulation in Groundwater}.
+
+    First, there is a species mass balance:
+    \begin{equation}
+        \conc{As (III)}_0 + \conc{As (V)}_0 = \conc{As (III)} + \conc{As (III)}_\ads + \conc{As (V)}_{\tot}
+    \end{equation}
+    \begin{equation}
+        \conc{As (V)}_\tot = \conc{As (V)}_\ads + \conc{As (V)}
+    \end{equation}
+    \begin{equation}
+        \conc{P} = \conc{P}_0 - \conc{P}_\ads
+    \end{equation}
+    \begin{equation}
+        \conc{Si} = \conc{Si}_0 - \conc{Si}_\ads
+    \end{equation}
+
+    There are also some kinetics equations:
+    \begin{equation}
+        \dv{\conc{Fe(II)}}{t} = -k_{\mathrm{app}}\conc{Fe(II)}\conc{O2} + \dv{\conc{Fe (II)}_{\mathrm{dosage}}}{t} - k_{\ch{H2O2}}\conc{Fe(II)}\conc{H2O2}
+    \end{equation}
+    \begin{equation}
+        \dv{\conc{Fe (III)}}{t} = k_{\mathrm{app}}\conc{Fe (II)}\conc{O2} + k_{\ch{H2O2}}\conc{Fe(II)}\conc{H2O2}
+    \end{equation}
+    \begin{equation}
+        \dv{\conc{O2}}{t} = k_{\mathrm{r}}(\conc{O2}_{\sat} - \conc{O2}) - k_{\mathrm{app}}\conc{Fe (II)}\conc{O2}
+    \end{equation}
+    \begin{equation}
+        \dv{\conc{As  (V)}_\tot}{t} = \frac{\beta}{1 + \frac{k_1\conc{Fe (II)}}{k_2\conc{As (III)}}}k_{\mathrm{app}}\conc{Fe (II)}\conc{O2}
+    \end{equation}
+    \begin{equation}
+        \dv{\conc{H2O2}}{t} = \dv{\conc{Fe(II)}_{\mathrm{dosage}}}{t} - k_{\ch{H2O2}}\conc{Fe(II)}\conc{H2O2} - L(t) \approx \dv{\conc{Fe(II)}_{\mathrm{dosage}}}{t} - k_{\ch{H2O2}}\conc{Fe(II)}\conc{H2O2}
+    \end{equation}
+    \begin{equation}
+        \dv{\conc{H2}}{t} = 2\epsilon_{\mathrm{red}}\dv{\conc{Fe (II)}_{\mathrm{dosage}}}{t} \approx \SI{0}{\Molar\per\second}
+    \end{equation}
+
+    The above equations will be used in the form of the differential algebraic equation.
+
+    Also, there are some adsorption equations:
+    \[\conc{As (III)}_\ads = \frac{q_{\max}\conc{Fe(III)}K_{\ch{As (III)}} \conc{As(III)}}{1 + K_{\ch{As (III)}}\ch{As(III)} + K_{\ch{As (V)}}\conc{As (V)} + K_{\ch{P}}\conc{P} + K_{\ch{Si}}\conc{Si}}\]
+    \[\conc{As (V)}_\ads = \frac{q_{\max}\conc{Fe(III)}K_{\ch{As (V)}} \conc{As(V)}}{1 + K_{\ch{As (III)}}\ch{As(III)} + K_{\ch{As (V)}}\conc{As (V)} + K_{\ch{P}}\conc{P} + K_{\ch{Si}}\conc{Si}}\]
+    \[\conc{P}_\ads = \frac{q_{\max}\conc{Fe(III)}K_{\ch{P}} \conc{P}}{1 + K_{\ch{As (III)}}\ch{As(III)} + K_{\ch{As (V)}}\conc{As (V)} + K_{\ch{P}}\conc{P} + K_{\ch{Si}}\conc{Si}}\]
+    \[\conc{Si}_\ads = \frac{q_{\max}\conc{Fe(III)}K_{\ch{Si}} \conc{Si}}{1 + K_{\ch{As (III)}}\ch{As(III)} + K_{\ch{As (V)}}\conc{As (V)} + K_{\ch{P}}\conc{P} + K_{\ch{Si}}\conc{Si}}\]
+
+    Here we compute some initial conditions which are absent from the formulation of the differential algebraic equation.
+    Note that, since
+    \[\dv{\conc{As (III)}}{t} = -k_2\conc{As (III)}\conc{Fe (IV)}\]
+    and $\conc{Fe (IV)} \approx \SI{0}{\Molar\per\second}$ at $t = 0$ since it's not part of the original system,
+    \[\eval{\dv{\conc{As (III)}}{t}}_{t = 0} \approx \SI{0}{\Molar\per\second}\]
+
+    Also, through more complicated but similar calculations using the mass balance and adsorbance it can be shown that
+    \[\eval{\dv{\conc{As (V)}}{t}}_{t = 0} \approx \eval{\dv{\conc{P}}{t}}_{t = 0} \approx \eval{\dv{\conc{Si}}{t}}_{t = 0} \approx \SI{0}{\Molar\per\second}\]
+
+    The rest can be computed directly from the kinetic equations given above.
+
+    Define the vector
+    \[\vb{c} = \bmqty{\conc{As (III)} \\ \conc{As (V)} \\ \conc{P} \\ \conc{Si} \\ \conc{Fe (II)} \\ \conc{Fe (III)} \\ \conc{O2} \\ \conc{As (V)}_\tot \\ \pH}\]
+    Then we have the equation
+    \[\bmqty{0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+            0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+            0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+            0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+            0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+            0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\
+            0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0\\
+            0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 & 0\\
+            0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 \\
+        0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1}\dv{\vb{c}}{t}
+    = \bmqty{(\conc{As (III)}_0 + \conc{As (V)}_0) - (\conc{As (III)} + \conc{As (III)}_\ads + \conc{As (V)}_\tot) \\ \conc{As (V)}_\tot - (\conc{As (V)}_\ads + \conc{As (V)}) \\ \conc{P} - (\conc{P}_0 - \conc{P}_\ads) \\ \conc{Si} - (\conc{Si}_0 - \conc{Si}_\ads) \\ -k_{\mathrm{app}}\conc{Fe(II)}\conc{O2} + \dv*{\conc{Fe (II)}_{\mathrm{dosage}}}{t} \\ k_{\mathrm{app}}\conc{Fe(II)}\conc{O2} \\ k_{\mathrm{r}}(\conc{O2}_{\sat} - \conc{O2}) - k_{\mathrm{app}}\conc{Fe (II)}\conc{O2} \\ (\beta k_{\mathrm{app}}\conc{Fe (II)}\conc{O2})/({1 + ((k_1\conc{Fe (II)})/(k_2\conc{As (III)}))}) \\ \dv*{\conc{Fe(II)}_{\mathrm{dosage}}{t} - k_{\ch{H2O2}}\conc{Fe(II)}\conc{H2O2} - L(t)} \\ 0}\]
+
+    which is a stiff index 1 differential algebraic equation, solvable by regular methods.
+
+    \subsection{Constants}
+
+    The constants used in the equations are as follows. Some are actually functions of $\pH$.
+    \begin{multicols}{2}
+        \begin{itemize}
+            \ii $K_{\ch{As (III)}} \approx 10^{3.81}$
+            \ii $K_{\ch{P}}(\pH) \approx 10^{10.30 -0.65 \cdot \mathrm{pH}}$
+            \ii $K_{\ch{As (V)}}(\pH) \approx 10^{8.95 -0.53 \cdot \mathrm{pH}}$
+            \ii $K_{\ch{Si}}(\pH) \approx 10^{-6.63 + 1.15\cdot \mathrm{pH}}$
+            \ii $K_{\ch{H2O2}}(\pH) \approx 10^{0.89\cdot \pH - 2.55}$
+            \columnbreak
+            \ii $k_{\mathrm{app}}(\pH) \approx 10^{-10.58 + 1.64\cdot \mathrm{pH}}$
+            \ii $\frac{k_1}{k_2}(\pH) \approx -6.63 + 1.15\cdot \pH$
+            \ii $k_{\mathrm{r}} \approx \SI{e-3.26}{\per\second}$
+            \ii $q_{\max}(\pH) \approx -2.19 + 0.45 \cdot \pH$
+            \ii $\beta \approx 0.25$
+    \end{itemize}
+\end{multicols}
+
+\section{Variable Catalogue}
+
+\subsection{Constants}
+\begin{multicols}{3}
+    \begin{itemize}
+        \ii $\verb|faraday_constant|$: $\cF \approx \SI{96485}{\coulomb\per\mole}$
+        \ii $\verb|mm_x|$: molar mass of species $x$
+        \ii $\verb|O2_saturation_20C|$: $\conc{O2}_\sat$ at $\SI{20}{\celsius}$
+        \ii $\verb|O2_saturation_25C|$: $\conc{O2}_\sat$ at $\SI{25}{\celsius}$
+        \ii $\verb|K_AsIII|$: $K_{\ch{As (III)}}$
+        \ii $\verb|K_AsV|$: $K_{\ch{As(V)}}$ (function of $\pH$)
+        \ii $\verb|K_P|$: $K_{\ch{P}}$ (function of $\pH$)
+        \ii $\verb|K_Si|$: $K_{\ch{Si}}$ (function of $\pH$)
+        \ii $\verb|K_H2O2|$: $K_{\ch{H2O2}}$ (function of $\pH$)
+        \ii $\verb|q_max|$: $q_{\max}$ (function of $\pH$)
+        \ii $\verb|k_app|$: $k_{\mathrm{app}}$ (function of $\pH$)
+        \ii $\verb|k_1_div_k_2|$: $k_1/k_2$ (function of $\pH$)
+        \ii $\verb|k_r|$: $k_{\mathrm{r}}$
+        \ii $\verb|beta|$: $\beta$
+\end{itemize}
+        \end{multicols}
+
+        \subsection{Other Variables}
+        \begin{multicols}{2}
+            \begin{itemize}
+                \ii $\verb|dose_time|$: time of dosage, minutes
+                \ii $\verb|dose_rate|$: $\dv*{\conc{Fe (II)}_{\mathrm{dosage}}}{t}$, coulombs per second
+                \ii $\verb|dose_load|$: $\conc{Fe (II)}_{\mathrm{dosage}}$, coulombs
+                \ii $\verb|mix_time|$: time of mixing (zero dosing), minutes
+                \ii $\verb|initial_conc|$: initial concentration vector $\vb{c}(0)$, units are $\si{\milli\Molar}$
+                \ii $\verb|fe_dosage_rate|$: $\verb|dose_rate|$ in units of $\si{\Molar\per\second}$
+                \ii $\verb|fe_dosage_load|$: $\verb|dose_load|$ in units of $\si{\Molar}$
+                \ii $\verb|time_list|, \verb|conc_list|$: arrays holding time and concentration values from simulation ($\verb|conc_list[i]| = \vb{c}(\verb|time_dose[i]|)$)
+                \ii $\verb|time_dose_list|, \verb|conc_dose|$: arrays holding time and concentration values from simulation during dosage period ($\verb|conc_dose[i]| = \vb{c}(\verb|time_dose[i]|)$)
+        \end{itemize}
+    \end{multicols}
+
+    \subsection{Vectors}
+
+    \begin{itemize}
+        \ii Concentration vector $\vb{c}$:
+        \[\vb{c} = \qty(\underbrace{\conc{As (III)}}_{\texttt{c[0]}}, \underbrace{\conc{As (V)}}_{\texttt{c[1]}}, \underbrace{\conc{P}}_{\texttt{c[2]}}, \underbrace{\conc{Si}}_{\texttt{c[3]}}, \underbrace{\conc{Fe (II)}}_{\texttt{c[4]}}, \underbrace{\conc{Fe (III)}}_{\texttt{c[5]}}, \underbrace{\conc{O2}}_{\texttt{c[6]}}, \underbrace{\conc{As (V)}_\tot}_{\texttt{c[7]}}, \underbrace{\pH}_{\texttt{c[8]}})\]
+        \ii Adsorbed species vector $\vb{a}$:
+        \[\vb{a} = \qty(\underbrace{\conc{As (III)}_\ads}_{\texttt{a[0]}}, \underbrace{\conc{As (V)}_\ads}_{\texttt{a[1]}}, \underbrace{\conc{P}_\ads}_{\texttt{a[2]}}, \underbrace{\conc{Si}_\ads}_{\texttt{a[3]}})\]
+\end{itemize}
+\section{Integration Implementation}
+
+We utilize an implicit problem model using the Assimulo library, integrated using. The residue function $\Res(t; \vb{c}, \dv*{\vb{c}}{t})$ (which is simply one side of the differential algebraic equation subtracted from the other) is a function in both $\vb{c}$ and $\dv*{\vb{c}}{t}$, so it is required to provide initial conditions for both $\vb{c}$ and its derivative. We concern ourselves only with the problem at $t = 0$, since otherwise we can integrate to the time value and take the values in $\vb{c}$ and $\dv*{\vb{c}}{t}$ from there.
+
+We have that the inital conditions in $\vb{c}$ are given by manual input. On the flip side, we compute that the initial conditions in $\dv*{\vb{c}}{t}$ are
+\[\eval{\dv{\vb{c}}{t}}_{t = 0} = \bmqty{0 \\ 0 \\ 0 \\ 0 \\ -k_{\mathrm{app}}\conc{Fe(II)}_0\conc{O2}_0 + \dv*{\conc{Fe (II)}_{\mathrm{dosage}}}{t} \\ k_{\mathrm{app}}\conc{Fe (II)}_0\conc{O2}_0 \\ k_{\mathrm{r}}(\conc{O2}_\sat - \conc{O2}_0) - k_{\mathrm{app}}\conc{Fe(II)}_0\conc{O_2}_0 \\ (\beta k_{\mathrm{app}}\conc{Fe (II)}_0\conc{O2}_0)/({1 + ((k_1\conc{Fe (II)}_0)/(k_2\conc{As (III)}_0))}) \\ 0}\]
+(see some computations above for reasoning).
+
+These initial conditions are plugged into the Radau5 solver, with an absolute tolerance of 1 part in $10^{7}$ and a relative tolerance of 1 part in $10^5$.
+
+The system is relatively stiff, which is accounted for by employing the \verb|Radau5DAE| library, which is good for stiff problems.
+\end{document}
